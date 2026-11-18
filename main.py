@@ -28,10 +28,10 @@ BG_FILE = "background.png"    # ضع هنا الخلفية حقتك (اختيا�
 BTN_COLOR = (137, 133, 184)   # #8985b8 لون المستطيل
 CORNER_COLOR = (137, 133, 184) # #8985b8 لون المربع الصغير
 TEXT_COLOR = (255, 255, 255)
-WIN_MESSAGE = "الإجابة صحيحة 🫡"   # يرسل مع منشن الفائز
+WIN_MESSAGE = "الإجابة صحيحة م توقعت 🫡"   # يرسل مع منشن الفائز
 STOP_COMMAND = "وقف الاختبار"      # أمر الأونر فقط
-BUSY_MESSAGE = "مختبرك يا وحش، جاوب لا تصرف"
-NO_WINNER_MESSAGE = "ما في أحد جاوب إجابة صحيحة"
+BUSY_MESSAGE = "بخصوص اني راسل صوره يعني؟ ، جاوب لا تصرف"
+NO_WINNER_MESSAGE = " ما في أحد جاوب إجابة صحيحة الله لايبلانا تثقفو تثقفو "
 OWNER_ID = int(os.environ.get("OWNER_ID", "912349519990095892"))  # اختياري: ايدي حسابك، وإلا يؤخذ تلقائياً من مالك البوت
 
 # ------------------------------------------------------------------
@@ -378,26 +378,18 @@ def _background() -> Image.Image:
 
 
 def make_image(word: str) -> io.BytesIO:
-    img = _background().convert("RGBA")
-    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
+    # صورة بخلفية شفافة بالكامل: المستطيل + المربع الصغير + الكلمة فقط
+    img = Image.new("RGBA", (IMG_W, IMG_H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
 
-    # المربع الأزرق في النص
     bw, bh = 640, 150
     bx0 = (IMG_W - bw) // 2
     by0 = (IMG_H - bh) // 2 + 30
     bx1, by1 = bx0 + bw, by0 + bh
-
-    # ظل خفيف
-    shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    ImageDraw.Draw(shadow).rounded_rectangle((bx0, by0 + 8, bx1, by1 + 8), 18, fill=(0, 0, 0, 140))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(10))
-    img = Image.alpha_composite(img, shadow)
-
     d.rounded_rectangle((bx0, by0, bx1, by1), 18, fill=BTN_COLOR + (255,))
 
-    # المربع الصغير يمين فوق (يتداخل مع الزاوية)
-    cf = _font(34)
+    # المربع الصغير يمين فوق
+    cf = _font(32)
     label = _ar(CORNER_TEXT)
     lb = d.textbbox((0, 0), label, font=cf)
     lw, lh = lb[2] - lb[0], lb[3] - lb[1]
@@ -406,8 +398,16 @@ def make_image(word: str) -> io.BytesIO:
     cx1 = bx1 + 40
     cy1 = by0 + ch // 2
     cx0, cy0 = cx1 - cw, cy1 - ch
-    d.rounded_rectangle((cx0, cy0, cx1, cy1), 12, fill=CORNER_COLOR + (255,), outline=(8, 8, 24, 255), width=4)
-    d.text((cx0 + pad_x - lb[0], cy0 + pad_y - lb[1]), label, font=cf, fill=TEXT_COLOR)
+
+    # فراغ شفاف رفيع حول المربع الصغير عشان ينفصل عن المستطيل
+    gap = Image.new("L", img.size, 0)
+    ImageDraw.Draw(gap).rounded_rectangle((cx0 - 5, cy0 - 5, cx1 + 5, cy1 + 5), 16, fill=255)
+    alpha = Image.composite(Image.new("L", img.size, 0), img.getchannel("A"), gap)
+    img.putalpha(alpha)
+    d = ImageDraw.Draw(img)
+
+    d.rounded_rectangle((cx0, cy0, cx1, cy1), 12, fill=CORNER_COLOR + (255,))
+    d.text((cx0 + pad_x - lb[0], cy0 + pad_y - lb[1]), label, font=cf, fill=TEXT_COLOR + (255,))
 
     # الكلمة الإنجليزية، نصغر الخط لو طويلة
     size = 84
@@ -418,11 +418,10 @@ def make_image(word: str) -> io.BytesIO:
         wf = _font(size)
         wb = d.textbbox((0, 0), word, font=wf)
     tw, th = wb[2] - wb[0], wb[3] - wb[1]
-    d.text((bx0 + (bw - tw) / 2 - wb[0], by0 + (bh - th) / 2 - wb[1]), word, font=wf, fill=TEXT_COLOR)
+    d.text((bx0 + (bw - tw) / 2 - wb[0], by0 + (bh - th) / 2 - wb[1]), word, font=wf, fill=TEXT_COLOR + (255,))
 
-    final = Image.alpha_composite(img, layer).convert("RGB")
     buf = io.BytesIO()
-    final.save(buf, "PNG")
+    img.save(buf, "PNG")
     buf.seek(0)
     return buf
 
